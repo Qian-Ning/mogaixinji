@@ -53,11 +53,14 @@ echo "[2/3] Building MogaiConfig.app ..."
 CONFIG_APP_DIR="$OUTPUT_DIR/MogaiConfig.app"
 mkdir -p "$CONFIG_APP_DIR"
 
-# 编译所有 .m 文件（最小测试版：仅 main + AppDelegate）
+# 编译所有 .m 文件
 echo "  Compiling source files..."
 for src in \
     "$PROJECT_DIR/MogaiConfig/main.m" \
-    "$PROJECT_DIR/MogaiConfig/AppDelegate.m"; do
+    "$PROJECT_DIR/MogaiConfig/AppDelegate.m" \
+    "$PROJECT_DIR/MogaiConfig/ViewControllers/MainVC.m" \
+    "$PROJECT_DIR/MogaiConfig/ViewControllers/LogVC.m" \
+    "$PROJECT_DIR/MogaiConfig/Models/MogaiConfig.m"; do
 
     if [ ! -f "$src" ]; then
         echo "  [!] Source not found: $src"
@@ -66,6 +69,8 @@ for src in \
     basename=$(basename "$src" .m)
     clang $BASE_FLAGS \
         -I"$PROJECT_DIR/MogaiConfig" \
+        -I"$PROJECT_DIR/MogaiConfig/ViewControllers" \
+        -I"$PROJECT_DIR/MogaiConfig/Models" \
         -c "$src" \
         -o "$BUILD_DIR/obj/${basename}.o"
     echo "    compiled ${basename}.o"
