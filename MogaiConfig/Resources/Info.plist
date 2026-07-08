@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDevelopmentRegion</key>
-    <string>zh_CN</string>
+    <string>en</string>
     <key>CFBundleDisplayName</key>
-    <string>魔改新机</string>
+    <string>MogaiConfig</string>
     <key>CFBundleExecutable</key>
     <string>MogaiConfig</string>
     <key>CFBundleIdentifier</key>
@@ -24,11 +24,6 @@
     <true/>
     <key>MinimumOSVersion</key>
     <string>14.0</string>
-    <key>UIApplicationSceneManifest</key>
-    <dict>
-        <key>UIApplicationSupportsMultipleScenes</key>
-        <false/>
-    </dict>
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>

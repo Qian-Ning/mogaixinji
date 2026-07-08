@@ -5,21 +5,19 @@
 @implementation AppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-    self.window = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
+    self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
 
     UITabBarController *tabController = [[UITabBarController alloc] init];
 
     MainVC *mainVC = [[MainVC alloc] init];
-    mainVC.tabBarItem = [[UITabBarItem alloc] initWithTitle:@"魔改" image:[UIImage systemImageNamed:@"wand.and.stars"] tag:0];
+    UINavigationController *nav1 = [[UINavigationController alloc] initWithRootViewController:mainVC];
+    mainVC.tabBarItem = [[UITabBarItem alloc] initWithTitle:@"魔改" image:nil tag:0];
 
     LogVC *logVC = [[LogVC alloc] init];
-    logVC.tabBarItem = [[UITabBarItem alloc] initWithTitle:@"日志" image:[UIImage systemImageNamed:@"list.bullet"] tag:1];
+    UINavigationController *nav2 = [[UINavigationController alloc] initWithRootViewController:logVC];
+    logVC.tabBarItem = [[UITabBarItem alloc] initWithTitle:@"日志" image:nil tag:1];
 
-    tabController.viewControllers = @[
-        [[UINavigationController alloc] initWithRootViewController:mainVC],
-        [[UINavigationController alloc] initWithRootViewController:logVC],
-    ];
-
+    tabController.viewControllers = @[nav1, nav2];
     self.window.rootViewController = tabController;
     [self.window makeKeyAndVisible];
 
