@@ -14,7 +14,6 @@
 @property (nonatomic, strong) UIButton *cleanButton;
 @property (nonatomic, strong) UIButton *resetButton;
 @property (nonatomic, strong) UIScrollView *scrollView;
-@property (nonatomic, strong) UIView *contentView;
 @end
 
 @implementation MainVC
@@ -23,8 +22,7 @@
     [super viewDidLoad];
     self.title = @"魔改新机 v2.0 Pro";
     self.view.backgroundColor = [UIColor systemBackgroundColor];
-
-    [self setupUI];
+    [self setupScrollView];
     [self loadConfig];
 }
 
@@ -33,177 +31,183 @@
     [self refreshDisplay];
 }
 
-- (void)setupUI {
-    self.scrollView = [[UIScrollView alloc] init];
-    self.scrollView.translatesAutoresizingMaskIntoConstraints = NO;
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    [self layoutContent];
+}
+
+- (CGFloat)contentWidth {
+    return self.scrollView.frame.size.width > 0 ? self.scrollView.frame.size.width : [UIScreen mainScreen].bounds.size.width;
+}
+
+- (void)setupScrollView {
+    self.scrollView = [[UIScrollView alloc] initWithFrame:self.view.bounds];
+    self.scrollView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     [self.view addSubview:self.scrollView];
+}
 
-    self.contentView = [[UIView alloc] init];
-    self.contentView.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.scrollView addSubview:self.contentView];
+- (void)createLabelsAndControls {
+    // 移除旧的子视图
+    for (UIView *v in self.scrollView.subviews) {
+        [v removeFromSuperview];
+    }
 
-    [NSLayoutConstraint activateConstraints:@[
-        [self.scrollView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
-        [self.scrollView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-        [self.scrollView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
-        [self.scrollView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
-
-        [self.contentView.topAnchor constraintEqualToAnchor:self.scrollView.topAnchor],
-        [self.contentView.leadingAnchor constraintEqualToAnchor:self.scrollView.leadingAnchor],
-        [self.contentView.trailingAnchor constraintEqualToAnchor:self.scrollView.trailingAnchor],
-        [self.contentView.bottomAnchor constraintEqualToAnchor:self.scrollView.bottomAnchor],
-        [self.contentView.widthAnchor constraintEqualToAnchor:self.scrollView.widthAnchor],
-    ]];
-
+    CGFloat w = [self contentWidth];
     CGFloat pad = 20;
     CGFloat y = pad;
 
-    // ===== Header =====
-    UILabel *header = [[UILabel alloc] initWithFrame:CGRectMake(pad, y, self.view.frame.size.width - pad*2, 30)];
-    header.text = @"⚡ 一键改机控制";
+    // Header
+    UILabel *header = [[UILabel alloc] initWithFrame:CGRectMake(pad, y, w - pad*2, 30)];
+    header.text = @"魔改新机 v2.0";
     header.font = [UIFont boldSystemFontOfSize:22];
-    [self.contentView addSubview:header];
+    [self.scrollView addSubview:header];
     y += 40;
 
-    // ===== 启用开关 =====
-    UIView *enabledRow = [self rowWithFrame:CGRectMake(pad, y, self.view.frame.size.width - pad*2, 44)
-                                      label:@"启用魔改"
-                                      switch:self.enabledSwitch = [[UISwitch alloc] init]];
-    [self.contentView addSubview:enabledRow];
+    // 启用开关
+    self.enabledSwitch = [[UISwitch alloc] init];
+    UIView *enabledRow = [self rowWithFrame:CGRectMake(pad, y, w - pad*2, 44)
+                                     label:@"启用魔改"
+                                    switch:self.enabledSwitch];
+    [self.scrollView addSubview:enabledRow];
     [self.enabledSwitch addTarget:self action:@selector(enabledChanged:) forControlEvents:UIControlEventValueChanged];
     y += 55;
 
-    // ===== 每次启动自动随机化 =====
-    UIView *autoRow = [self rowWithFrame:CGRectMake(pad, y, self.view.frame.size.width - pad*2, 44)
+    // 自动随机化
+    self.autoRandomizeSwitch = [[UISwitch alloc] init];
+    UIView *autoRow = [self rowWithFrame:CGRectMake(pad, y, w - pad*2, 44)
                                   label:@"每次启动自动随机"
-                                  switch:self.autoRandomizeSwitch = [[UISwitch alloc] init]];
-    [self.contentView addSubview:autoRow];
+                                 switch:self.autoRandomizeSwitch];
+    [self.scrollView addSubview:autoRow];
     [self.autoRandomizeSwitch addTarget:self action:@selector(autoRandomizeChanged:) forControlEvents:UIControlEventValueChanged];
     y += 55;
 
-    // ===== 状态标签 =====
-    self.statusLabel = [[UILabel alloc] initWithFrame:CGRectMake(pad, y, self.view.frame.size.width - pad*2, 20)];
+    // 状态标签
+    self.statusLabel = [[UILabel alloc] initWithFrame:CGRectMake(pad, y, w - pad*2, 20)];
     self.statusLabel.font = [UIFont systemFontOfSize:14];
     self.statusLabel.textColor = [UIColor secondaryLabelColor];
-    [self.contentView addSubview:self.statusLabel];
+    [self.scrollView addSubview:self.statusLabel];
     y += 30;
 
-    // ===== 参数预览 =====
-    UILabel *previewHeader = [[UILabel alloc] initWithFrame:CGRectMake(pad, y, self.view.frame.size.width - pad*2, 24)];
+    // 参数预览标题
+    UILabel *previewHeader = [[UILabel alloc] initWithFrame:CGRectMake(pad, y, w - pad*2, 24)];
     previewHeader.text = @"当前设备参数";
     previewHeader.font = [UIFont boldSystemFontOfSize:17];
-    [self.contentView addSubview:previewHeader];
+    [self.scrollView addSubview:previewHeader];
     y += 30;
 
-    self.previewLabel = [[UILabel alloc] initWithFrame:CGRectMake(pad, y, self.view.frame.size.width - pad*2, 160)];
+    // 参数预览内容
+    self.previewLabel = [[UILabel alloc] initWithFrame:CGRectMake(pad, y, w - pad*2, 160)];
     self.previewLabel.font = [UIFont fontWithName:@"Menlo" size:12];
     self.previewLabel.textColor = [UIColor labelColor];
     self.previewLabel.numberOfLines = 0;
-    [self.contentView addSubview:self.previewLabel];
+    [self.scrollView addSubview:self.previewLabel];
     y += 170;
 
-    // ===== 自定义设置 =====
-    UILabel *configHeader = [[UILabel alloc] initWithFrame:CGRectMake(pad, y, self.view.frame.size.width - pad*2, 24)];
+    // 自定义设置标题
+    UILabel *configHeader = [[UILabel alloc] initWithFrame:CGRectMake(pad, y, w - pad*2, 24)];
     configHeader.text = @"自定义锁定（选填）";
     configHeader.font = [UIFont boldSystemFontOfSize:17];
-    [self.contentView addSubview:configHeader];
+    [self.scrollView addSubview:configHeader];
     y += 30;
 
-    self.configLabel = [[UILabel alloc] initWithFrame:CGRectMake(pad, y, self.view.frame.size.width - pad*2, 30)];
+    self.configLabel = [[UILabel alloc] initWithFrame:CGRectMake(pad, y, w - pad*2, 30)];
     self.configLabel.text = @"留空则随机生成";
     self.configLabel.font = [UIFont systemFontOfSize:13];
     self.configLabel.textColor = [UIColor secondaryLabelColor];
-    [self.contentView addSubview:self.configLabel];
+    [self.scrollView addSubview:self.configLabel];
     y += 30;
 
     // 型号输入
     UILabel *modelLabel = [[UILabel alloc] initWithFrame:CGRectMake(pad, y, 80, 34)];
     modelLabel.text = @"型号";
     modelLabel.font = [UIFont systemFontOfSize:15];
-    [self.contentView addSubview:modelLabel];
+    [self.scrollView addSubview:modelLabel];
 
-    self.modelField = [[UITextField alloc] initWithFrame:CGRectMake(pad + 85, y, self.view.frame.size.width - pad*2 - 85, 34)];
+    self.modelField = [[UITextField alloc] initWithFrame:CGRectMake(pad + 85, y, w - pad*2 - 85, 34)];
     self.modelField.borderStyle = UITextBorderStyleRoundedRect;
     self.modelField.placeholder = @"如 iPhone15,3";
     self.modelField.font = [UIFont systemFontOfSize:15];
     self.modelField.autocapitalizationType = UITextAutocapitalizationTypeNone;
     self.modelField.autocorrectionType = UITextAutocorrectionTypeNo;
-    [self.modelField addTarget:self action:@selector(modelChanged) forControlEvents:UIControlEventEditingDidEnd];
-    [self.contentView addSubview:self.modelField];
+    [self.modelField addTarget:self action:@selector(modelChanged:) forControlEvents:UIControlEventEditingDidEnd];
+    [self.scrollView addSubview:self.modelField];
     y += 44;
 
     // 系统版本输入
     UILabel *verLabel = [[UILabel alloc] initWithFrame:CGRectMake(pad, y, 80, 34)];
     verLabel.text = @"系统版本";
     verLabel.font = [UIFont systemFontOfSize:15];
-    [self.contentView addSubview:verLabel];
+    [self.scrollView addSubview:verLabel];
 
-    self.sysVerField = [[UITextField alloc] initWithFrame:CGRectMake(pad + 85, y, self.view.frame.size.width - pad*2 - 85, 34)];
+    self.sysVerField = [[UITextField alloc] initWithFrame:CGRectMake(pad + 85, y, w - pad*2 - 85, 34)];
     self.sysVerField.borderStyle = UITextBorderStyleRoundedRect;
     self.sysVerField.placeholder = @"如 16.6.1";
     self.sysVerField.font = [UIFont systemFontOfSize:15];
     self.sysVerField.autocapitalizationType = UITextAutocapitalizationTypeNone;
     self.sysVerField.autocorrectionType = UITextAutocorrectionTypeNo;
-    [self.sysVerField addTarget:self action:@selector(sysVerChanged) forControlEvents:UIControlEventEditingDidEnd];
-    [self.contentView addSubview:self.sysVerField];
+    [self.sysVerField addTarget:self action:@selector(sysVerChanged:) forControlEvents:UIControlEventEditingDidEnd];
+    [self.scrollView addSubview:self.sysVerField];
     y += 50;
 
-    // ===== 操作按钮 =====
+    // 一键生成
     self.generateButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.generateButton.frame = CGRectMake(pad, y, self.view.frame.size.width - pad*2, 50);
-    [self.generateButton setTitle:@"🔄 一键生成新参数" forState:UIControlStateNormal];
+    self.generateButton.frame = CGRectMake(pad, y, w - pad*2, 50);
+    [self.generateButton setTitle:@"一键生成新参数" forState:UIControlStateNormal];
     self.generateButton.titleLabel.font = [UIFont boldSystemFontOfSize:18];
     self.generateButton.backgroundColor = [UIColor systemBlueColor];
     self.generateButton.tintColor = [UIColor whiteColor];
     self.generateButton.layer.cornerRadius = 12;
     [self.generateButton addTarget:self action:@selector(generateTapped) forControlEvents:UIControlEventTouchUpInside];
-    [self.contentView addSubview:self.generateButton];
+    [self.scrollView addSubview:self.generateButton];
     y += 60;
 
+    // 沙盒清理
     self.cleanButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.cleanButton.frame = CGRectMake(pad, y, self.view.frame.size.width - pad*2, 50);
-    [self.cleanButton setTitle:@"🧹 清理沙盒 + 缓存 + Keychain" forState:UIControlStateNormal];
+    self.cleanButton.frame = CGRectMake(pad, y, w - pad*2, 50);
+    [self.cleanButton setTitle:@"清理沙盒 + Keychain" forState:UIControlStateNormal];
     self.cleanButton.titleLabel.font = [UIFont boldSystemFontOfSize:17];
     self.cleanButton.backgroundColor = [UIColor systemOrangeColor];
     self.cleanButton.tintColor = [UIColor whiteColor];
     self.cleanButton.layer.cornerRadius = 12;
     [self.cleanButton addTarget:self action:@selector(cleanTapped) forControlEvents:UIControlEventTouchUpInside];
-    [self.contentView addSubview:self.cleanButton];
+    [self.scrollView addSubview:self.cleanButton];
     y += 60;
 
+    // 恢复出厂
     self.resetButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.resetButton.frame = CGRectMake(pad, y, self.view.frame.size.width - pad*2, 50);
-    [self.resetButton setTitle:@"⚠️ 恢复出厂设置" forState:UIControlStateNormal];
+    self.resetButton.frame = CGRectMake(pad, y, w - pad*2, 50);
+    [self.resetButton setTitle:@"恢复出厂设置" forState:UIControlStateNormal];
     self.resetButton.titleLabel.font = [UIFont boldSystemFontOfSize:17];
     self.resetButton.backgroundColor = [UIColor systemRedColor];
     self.resetButton.tintColor = [UIColor whiteColor];
     self.resetButton.layer.cornerRadius = 12;
     [self.resetButton addTarget:self action:@selector(resetTapped) forControlEvents:UIControlEventTouchUpInside];
-    [self.contentView addSubview:self.resetButton];
+    [self.scrollView addSubview:self.resetButton];
     y += 60;
 
     // 使用说明
-    UILabel *tip = [[UILabel alloc] initWithFrame:CGRectMake(pad, y, self.view.frame.size.width - pad*2, 60)];
-    tip.text = @"💡 使用说明：\n1. 修改参数后，需要杀掉抖音后台重新打开\n2. 参数通过 NSUserDefaults app group 同步";
+    UILabel *tip = [[UILabel alloc] initWithFrame:CGRectMake(pad, y, w - pad*2, 60)];
+    tip.text = @"使用说明：\n1. 修改参数后，杀掉抖音后台重新打开\n2. 清理标记执行后自动清除";
     tip.font = [UIFont systemFontOfSize:12];
     tip.textColor = [UIColor tertiaryLabelColor];
     tip.numberOfLines = 0;
-    [self.contentView addSubview:tip];
-    y += 70;
+    [self.scrollView addSubview:tip];
+    y += 80;
 
-    self.contentView.frame = CGRectMake(0, 0, self.view.frame.size.width, y);
-    self.scrollView.contentSize = CGSizeMake(self.view.frame.size.width, y);
+    self.scrollView.contentSize = CGSizeMake(w, y);
+}
+
+- (void)layoutContent {
+    [self createLabelsAndControls];
+    [self refreshDisplay];
 }
 
 - (UIView *)rowWithFrame:(CGRect)frame label:(NSString *)labelText switch:(UISwitch *)sw {
     UIView *row = [[UIView alloc] initWithFrame:frame];
-
     UILabel *label = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, frame.size.width - 60, frame.size.height)];
     label.text = labelText;
     label.font = [UIFont systemFontOfSize:17];
-
     sw.frame = CGRectMake(frame.size.width - 51, (frame.size.height - 31) / 2, 51, 31);
-
     [row addSubview:label];
     [row addSubview:sw];
     return row;
@@ -217,30 +221,29 @@
 
 - (void)refreshDisplay {
     MogaiConfig *config = [MogaiConfig sharedConfig];
-
     self.enabledSwitch.on = config.enabled;
     self.autoRandomizeSwitch.on = config.randomizeOnLaunch;
     self.modelField.text = config.customModel;
     self.sysVerField.text = config.customSystemVersion;
 
     if (config.enabled) {
-        self.statusLabel.text = @"✅ 魔改已启用 - Hook已生效";
+        self.statusLabel.text = @"魔改已启用 - Hook已生效";
         self.statusLabel.textColor = [UIColor systemGreenColor];
     } else {
-        self.statusLabel.text = @"⛔ 魔改已禁用 - 使用真实设备参数";
+        self.statusLabel.text = @"魔改已禁用 - 使用真实设备参数";
         self.statusLabel.textColor = [UIColor systemRedColor];
     }
 
     self.previewLabel.text = [NSString stringWithFormat:
-        @"IDFV:        %@\n"
-        @"设备名:      %@\n"
-        @"型号:        %@\n"
-        @"系统版本:    %@\n"
-        @"序列号:      %@\n"
-        @"WiFi MAC:    %@\n"
-        @"蓝牙 MAC:    %@\n"
-        @"区域:        %@\n"
-        @"时区:        %@",
+        @"IDFV:       %@\n"
+        @"设备名:     %@\n"
+        @"型号:       %@\n"
+        @"系统版本:   %@\n"
+        @"序列号:     %@\n"
+        @"WiFi MAC:   %@\n"
+        @"蓝牙 MAC:   %@\n"
+        @"区域:       %@\n"
+        @"时区:       %@",
         config.currentIDFV ?: @"-",
         config.currentDeviceName ?: @"-",
         config.currentModel ?: @"-",
@@ -267,17 +270,15 @@
     [[MogaiConfig sharedConfig] save];
 }
 
-- (void)modelChanged {
-    NSString *val = self.modelField.text;
-    if (val.length == 0) val = nil;
-    [MogaiConfig sharedConfig].customModel = val;
+- (void)modelChanged:(UITextField *)sender {
+    NSString *val = sender.text;
+    [MogaiConfig sharedConfig].customModel = val.length > 0 ? val : nil;
     [[MogaiConfig sharedConfig] save];
 }
 
-- (void)sysVerChanged {
-    NSString *val = self.sysVerField.text;
-    if (val.length == 0) val = nil;
-    [MogaiConfig sharedConfig].customSystemVersion = val;
+- (void)sysVerChanged:(UITextField *)sender {
+    NSString *val = sender.text;
+    [MogaiConfig sharedConfig].customSystemVersion = val.length > 0 ? val : nil;
     [[MogaiConfig sharedConfig] save];
 }
 
@@ -297,7 +298,7 @@
     [LogVC log:@"用户请求沙盒清理"];
 
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"沙盒清理"
-        message:@"清理操作会在下次启动抖音时自动执行。\n\n确认清理以下内容：\n• Library/Caches/\n• Library/Preferences/\n• Keychain 数据\n• Cookie 存储"
+        message:@"清理操作会在下次启动抖音时自动执行"
         preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"执行清理" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
         NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:kMogaiSuiteName];
@@ -318,7 +319,7 @@
 - (void)resetTapped {
     [LogVC log:@"用户请求恢复出厂设置"];
 
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"⚠️ 确认重置"
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"确认重置"
         message:@"将恢复出厂默认配置并生成全新参数"
         preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"确认重置" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
