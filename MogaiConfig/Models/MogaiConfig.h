@@ -1,5 +1,7 @@
 #import <UIKit/UIKit.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 // 共享suite常量（必须与dylib一致）
 extern NSString *const kMogaiSuiteName;
 extern NSString *const kEnabledKey;
@@ -15,8 +17,6 @@ extern NSString *const kCurrentWifiMacKey;
 extern NSString *const kCurrentBtMacKey;
 extern NSString *const kCurrentLocaleKey;
 extern NSString *const kCurrentTZKey;
-
-NS_ASSUME_NONNULL_BEGIN
 
 @interface MogaiConfig : NSObject
 

@@ -55,6 +55,7 @@ mkdir -p "$CONFIG_APP_DIR"
 # 编译所有 .m 文件
 echo "  Compiling source files..."
 for src in \
+    "$PROJECT_DIR/MogaiConfig/main.m" \
     "$PROJECT_DIR/MogaiConfig/AppDelegate.m" \
     "$PROJECT_DIR/MogaiConfig/ViewControllers/MainVC.m" \
     "$PROJECT_DIR/MogaiConfig/ViewControllers/LogVC.m" \
