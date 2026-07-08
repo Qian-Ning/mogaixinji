@@ -76,7 +76,7 @@ static void rebind_symbols_for_image(struct rebindings_entry *rebindings, const 
     uintptr_t cur = (uintptr_t)header + sizeof(struct MACH_HEADER);
     for (uint32_t i = 0; i < header->ncmds; i++, cur += cur_seg_cmd->cmdsize) {
         cur_seg_cmd = (struct SEGMENT_COMMAND *)cur;
-        if (cur_seg_cmd->cmd == LC_SEGMENT_ARCH_DEPENDENT) {
+        if (cur_seg_cmd->cmd == LC_SEGMENT || cur_seg_cmd->cmd == LC_SEGMENT_64) {
             if (strcmp(cur_seg_cmd->segname, SEG_LINKEDIT) == 0) linkedit_segment = cur_seg_cmd;
         } else if (cur_seg_cmd->cmd == LC_SYMTAB) {
             symtab_cmd = (struct symtab_command *)cur_seg_cmd;
@@ -92,8 +92,8 @@ static void rebind_symbols_for_image(struct rebindings_entry *rebindings, const 
     cur = (uintptr_t)header + sizeof(struct MACH_HEADER);
     for (uint32_t i = 0; i < header->ncmds; i++, cur += cur_seg_cmd->cmdsize) {
         cur_seg_cmd = (struct SEGMENT_COMMAND *)cur;
-        if (cur_seg_cmd->cmd == LC_SEGMENT_ARCH_DEPENDENT) {
-            if (strcmp(cur_seg_cmd->segname, SEG_DATA) == 0 || strcmp(cur_seg_cmd->segname, SEG_DATA_CONST) == 0) {
+        if (cur_seg_cmd->cmd == LC_SEGMENT || cur_seg_cmd->cmd == LC_SEGMENT_64) {
+            if (strcmp(cur_seg_cmd->segname, SEG_DATA) == 0) {
                 for (uint32_t j = 0; j < cur_seg_cmd->nsects; j++) {
                     struct SECTION *sect = (struct SECTION *)(cur + sizeof(struct SEGMENT_COMMAND)) + j;
                     if ((sect->flags & SECTION_TYPE) == S_LAZY_SYMBOL_POINTERS) {
@@ -109,8 +109,8 @@ static void rebind_symbols_for_image(struct rebindings_entry *rebindings, const 
 }
 
 FISHHOOK_VISIBILITY
-static void _rebind_symbols_for_image(const struct MACH_HEADER *header, intptr_t slide) {
-    rebind_symbols_for_image(_rebindings_head, header, slide);
+static void _rebind_symbols_for_image(const struct mach_header *header, intptr_t slide) {
+    rebind_symbols_for_image(_rebindings_head, (const struct MACH_HEADER *)header, slide);
 }
 
 FISHHOOK_VISIBILITY
