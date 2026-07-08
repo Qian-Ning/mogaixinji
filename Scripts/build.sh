@@ -79,20 +79,12 @@ clang $BASE_FLAGS \
     -framework UIKit \
     -framework Foundation \
     -framework CoreGraphics \
-    -fobjc-link-runtime
+    -fobjc-link-runtime \
+    -Wl,-no_adhoc_codesign
 
-# 复制资源文件
+# 复制资源文件（TrollStore自己签名，不需要entitlements）
 echo "  Copying resources..."
 cp "$PROJECT_DIR/MogaiConfig/Resources/Info.plist" "$CONFIG_APP_DIR/"
-cp "$PROJECT_DIR/MogaiConfig/Resources/Entitlements.plist" "$CONFIG_APP_DIR/"
-
-# 用 ldid 签上 TrollStore 兼容的权限
-if command -v ldid &>/dev/null; then
-    ldid -S"$CONFIG_APP_DIR/Entitlements.plist" "$CONFIG_APP_DIR/MogaiConfig" 2>/dev/null || true
-    echo "  ✓ ldid signature applied"
-else
-    echo "  [!] ldid not found, skipping signature (TrollStore will handle it)"
-fi
 
 echo "  ✓ MogaiConfig.app built"
 
