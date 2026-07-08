@@ -12,7 +12,8 @@ BUILD_DIR="$PROJECT_DIR/build"
 OUTPUT_DIR="$BUILD_DIR/output"
 SDK=$(xcrun -sdk iphoneos --show-sdk-path)
 SDK_FLAGS="-isysroot $SDK -F$SDK/System/Library/Frameworks -I$SDK/usr/include"
-BASE_FLAGS="-arch arm64 -miphoneos-version-min=14.0 -fobjc-arc $SDK_FLAGS"
+TARGET="-target arm64-apple-ios14.0"
+BASE_FLAGS="-arch arm64 -fobjc-arc $TARGET $SDK_FLAGS"
 
 echo "=========================================="
 echo "  魔改新机 v2.0 Pro - CI Build"
@@ -52,14 +53,11 @@ echo "[2/3] Building MogaiConfig.app ..."
 CONFIG_APP_DIR="$OUTPUT_DIR/MogaiConfig.app"
 mkdir -p "$CONFIG_APP_DIR"
 
-# 编译所有 .m 文件
+# 编译所有 .m 文件（最小测试版：仅 main + AppDelegate）
 echo "  Compiling source files..."
 for src in \
     "$PROJECT_DIR/MogaiConfig/main.m" \
-    "$PROJECT_DIR/MogaiConfig/AppDelegate.m" \
-    "$PROJECT_DIR/MogaiConfig/ViewControllers/MainVC.m" \
-    "$PROJECT_DIR/MogaiConfig/ViewControllers/LogVC.m" \
-    "$PROJECT_DIR/MogaiConfig/Models/MogaiConfig.m"; do
+    "$PROJECT_DIR/MogaiConfig/AppDelegate.m"; do
 
     if [ ! -f "$src" ]; then
         echo "  [!] Source not found: $src"
@@ -68,8 +66,6 @@ for src in \
     basename=$(basename "$src" .m)
     clang $BASE_FLAGS \
         -I"$PROJECT_DIR/MogaiConfig" \
-        -I"$PROJECT_DIR/MogaiConfig/ViewControllers" \
-        -I"$PROJECT_DIR/MogaiConfig/Models" \
         -c "$src" \
         -o "$BUILD_DIR/obj/${basename}.o"
     echo "    compiled ${basename}.o"
@@ -82,7 +78,8 @@ clang $BASE_FLAGS \
     -o "$CONFIG_APP_DIR/MogaiConfig" \
     -framework UIKit \
     -framework Foundation \
-    -framework CoreGraphics
+    -framework CoreGraphics \
+    -fobjc-link-runtime
 
 # 复制资源文件
 echo "  Copying resources..."
@@ -99,6 +96,21 @@ fi
 
 echo "  ✓ MogaiConfig.app built"
 
+# 验证 .app 结构
+echo ""
+echo "  [Verify] App contents:"
+ls -la "$CONFIG_APP_DIR/"
+echo ""
+if command -v file &>/dev/null; then
+    echo "  [Verify] Binary type:"
+    file "$CONFIG_APP_DIR/MogaiConfig"
+fi
+echo ""
+if command -v otool &>/dev/null; then
+    echo "  [Verify] Minimum deployment target:"
+    otool -l "$CONFIG_APP_DIR/MogaiConfig" | grep -A2 "LC_VERSION_MIN\|LC_BUILD_VERSION" || echo "  (no version LC found!)"
+fi
+
 # =====================
 # 3. 打包 MogaiConfig.ipa
 # =====================
@@ -112,6 +124,11 @@ zip -q -r MogaiConfig.ipa Payload/
 rm -rf Payload
 
 echo "  ✓ MogaiConfig.ipa ($(stat -f%z "MogaiConfig.ipa" 2>/dev/null || echo "unknown") bytes)"
+
+# 验证 IPA 内容
+echo ""
+echo "  [Verify] IPA contents:"
+unzip -l MogaiConfig.ipa 2>/dev/null || echo "  (unzip failed!)"
 
 # =====================
 # 完成
