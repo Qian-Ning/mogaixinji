@@ -9,6 +9,7 @@
 @property (nonatomic, copy) NSString *customModel;
 @property (nonatomic, copy) NSString *customSystemVersion;
 @property (nonatomic, assign) BOOL randomizeOnLaunch;
+@property (nonatomic, assign) BOOL cleanRequested;
 
 // 当前生成的参数
 @property (nonatomic, copy, readonly) NSString *currentIDFV;

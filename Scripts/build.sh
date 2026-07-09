@@ -87,9 +87,10 @@ clang $BASE_FLAGS \
     -fobjc-link-runtime \
     -Wl,-no_adhoc_codesign
 
-# 复制资源文件（TrollStore自己签名，不需要entitlements）
+# 复制资源文件
 echo "  Copying resources..."
 cp "$PROJECT_DIR/MogaiConfig/Resources/Info.plist" "$CONFIG_APP_DIR/"
+cp "$PROJECT_DIR/MogaiConfig/Resources/Entitlements.plist" "$CONFIG_APP_DIR/"
 
 echo "  ✓ MogaiConfig.app built"
 

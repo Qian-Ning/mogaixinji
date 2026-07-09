@@ -209,14 +209,12 @@
 
 - (void)cleanTapped {
     [LogVC log:@"请求沙盒清理"];
-    UIAlertController *a = [UIAlertController alertControllerWithTitle:@"沙盒清理" message:@"下次启动抖音时自动执行" preferredStyle:UIAlertControllerStyleAlert];
-    [a addAction:[UIAlertAction actionWithTitle:@"执行清理" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *aa) {
-        NSUserDefaults *d = [[NSUserDefaults alloc] initWithSuiteName:kMogaiSuiteName];
-        [d setBool:YES forKey:@"MogaiCleanRequested"];
-        [d synchronize];
-        [LogVC log:@"清理标记已写入"];
-    }]];
-    [a addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    MogaiConfig *c = [MogaiConfig sharedConfig];
+    c.cleanRequested = YES;
+    [c save];
+    [LogVC log:@"清理标记已写入配置文件"];
+    UIAlertController *a = [UIAlertController alertControllerWithTitle:@"已标记清理" message:@"下次启动目标APP时执行" preferredStyle:UIAlertControllerStyleAlert];
+    [a addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:a animated:YES completion:nil];
 }
 

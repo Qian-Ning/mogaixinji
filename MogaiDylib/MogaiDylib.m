@@ -16,9 +16,6 @@
 extern CFTypeRef MGCopyAnswer(CFStringRef key);
 extern Boolean MGGetBoolAnswer(CFStringRef key);
 
-// Shared suite name (must match DeviceRandomizer.m and MogaiConfig)
-static NSString *const kMogaiSuiteName = @"group.com.mogai.config";
-
 // ========== 原函数指针 ==========
 
 // UIDevice
@@ -420,12 +417,11 @@ static void MogaiInit(void) {
         [[DeviceRandomizer sharedInstance] loadConfig];
 
         // 检查是否需要执行清理
-        NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:kMogaiSuiteName];
-        if ([defaults boolForKey:@"MogaiCleanRequested"]) {
+        if ([DeviceRandomizer sharedInstance].cleanRequested) {
             NSLog(@"[Mogai] Clean requested — performing full sandbox cleanup");
             [[SandboxCleaner sharedInstance] cleanAllForBundleID:[[NSBundle mainBundle] bundleIdentifier]];
-            [defaults setBool:NO forKey:@"MogaiCleanRequested"];
-            [defaults synchronize];
+            [DeviceRandomizer sharedInstance].cleanRequested = NO;
+            [[DeviceRandomizer sharedInstance] saveConfig];
             NSLog(@"[Mogai] Clean complete");
         }
 
