@@ -38,7 +38,9 @@ clang $BASE_FLAGS \
     -framework UIKit \
     -framework CoreFoundation \
     -install_name "@executable_path/MogaiDylib.dylib" \
-    -Wno-deprecated-declarations
+    -Wno-deprecated-declarations \
+    -Wno-incompatible-pointer-types \
+    -Wno-arc-bridge-casts-disallowed-in-nonarc
 
 echo "  ✓ MogaiDylib.dylib ($(stat -f%z "$OUTPUT_DIR/MogaiDylib.dylib" 2>/dev/null || echo "unknown") bytes)"
 

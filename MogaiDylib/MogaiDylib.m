@@ -64,7 +64,8 @@ static NSString *const kMogaiHandled = @"MogaiHandled";
         NSMutableArray *items = [comps.queryItems mutableCopy] ?: [NSMutableArray array];
         NSArray *strip = @[@"device_id", @"install_id", @"iid", @"openudid", @"clientudid"];
         for (NSInteger i = items.count - 1; i >= 0; i--) {
-            if ([strip containsObject:items[i].name]) [items removeObjectAtIndex:i];
+            NSURLQueryItem *item = (NSURLQueryItem *)items[i];
+            if ([strip containsObject:item.name]) [items removeObjectAtIndex:i];
         }
         comps.queryItems = items;
         mod.URL = comps.URL;
