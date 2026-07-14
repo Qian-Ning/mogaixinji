@@ -33,7 +33,6 @@ clang $BASE_FLAGS \
     -o "$OUTPUT_DIR/MogaiDylib.dylib" \
     "$PROJECT_DIR/MogaiDylib/MogaiDylib.m" \
     "$PROJECT_DIR/MogaiDylib/DeviceRandomizer.m" \
-    "$PROJECT_DIR/MogaiDylib/SandboxCleaner.m" \
     "$PROJECT_DIR/MogaiDylib/Fishhook/fishhook.c" \
     -framework Foundation \
     -framework UIKit \
