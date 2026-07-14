@@ -37,8 +37,6 @@ clang $BASE_FLAGS \
     -framework Foundation \
     -framework UIKit \
     -framework CoreFoundation \
-    -framework Security \
-    -framework AdSupport \
     -install_name "@executable_path/MogaiDylib.dylib" \
     -Wno-deprecated-declarations
 
