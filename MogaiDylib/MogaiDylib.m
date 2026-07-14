@@ -25,6 +25,9 @@ static CGFloat (*orig_screenScale)(id, SEL);
 
 static BOOL g_enabled = NO;
 
+// ========== 前置声明 ==========
+static CFTypeRef hook_MGCopyAnswer(CFStringRef key);
+
 // ========== dlsym 拦截 — 关键：防止抖音绕过 GOT ==========
 
 static void *hook_dlsym(void *handle, const char *symbol) {
