@@ -20,33 +20,26 @@ static NSString *(*orig_hostName)(id, SEL);
 static void (*orig_presentVC)(id, SEL, UIViewController *, BOOL, void (^)(void));
 
 static BOOL g_enabled = NO;
+static NSString *const kMogaiHandled = @"MogaiHandled";
 
-// ========== 1. NSURLProtocol 网络层拦截 ==========
+// ========== 1. NSURLProtocol ==========
 
 @interface MogaiURLProtocol : NSURLProtocol
 @end
 
-static NSMutableSet *g_interceptedURLs = nil;
-
 @implementation MogaiURLProtocol
 
-+ (void)load {
-    // Handled in constructor
-}
-
 + (BOOL)canInitWithRequest:(NSURLRequest *)request {
-    if (request.URL.absoluteString.length == 0) return NO;
-    // 只处理抖音 / TikTok 的请求
+    if (!g_enabled) return NO;
+    // 防止递归：已标记的请求直接放行
+    if ([NSURLProtocol propertyForKey:kMogaiHandled inRequest:request]) return NO;
     NSString *host = request.URL.host;
     if (!host) return NO;
-    if ([host containsString:@"aweme"] || [host containsString:@"douyin"] ||
-        [host containsString:@"tiktok"] || [host containsString:@"snssdk"] ||
-        [host containsString:@"bytedance"] || [host containsString:@"byteimg"] ||
-        [host containsString:@"byted"] || [host containsString:@"toutiao"] ||
-        [host containsString:@"iesdouyin"]) {
-        return ![g_interceptedURLs containsObject:request.URL.absoluteString];
-    }
-    return NO;
+    return [host containsString:@"aweme"] || [host containsString:@"douyin"] ||
+           [host containsString:@"tiktok"] || [host containsString:@"snssdk"] ||
+           [host containsString:@"bytedance"] || [host containsString:@"byteimg"] ||
+           [host containsString:@"byted"] || [host containsString:@"toutiao"] ||
+           [host containsString:@"iesdouyin"];
 }
 
 + (NSURLRequest *)canonicalRequestForRequest:(NSURLRequest *)request {
@@ -54,52 +47,39 @@ static NSMutableSet *g_interceptedURLs = nil;
 }
 
 - (void)startLoading {
-    [g_interceptedURLs addObject:self.request.URL.absoluteString];
-
     NSMutableURLRequest *mod = [self.request mutableCopy];
 
-    // 篡改 HTTP Header 中的设备信息
-    [mod setValue:@"off" forHTTPHeaderField:@"X-SS-REQ-TICKET"]; // 安全魔方 ticket
-    [mod setValue:[DeviceRandomizer sharedInstance].currentModel forHTTPHeaderField:@"X-SS-DEVICE-MODEL"];
-    [mod setValue:[DeviceRandomizer sharedInstance].currentSystemVersion forHTTPHeaderField:@"X-SS-DEVICE-VERSION"];
-    [mod setValue:[DeviceRandomizer sharedInstance].currentIDFV forHTTPHeaderField:@"X-SS-DEVICE-ID"];
+    // 标记此请求已处理，防止递归
+    [NSURLProtocol setProperty:@YES forKey:kMogaiHandled inRequest:mod];
 
-    // 随机化 URL 参数中的 device_id / iid 等
+    // 抹除安全魔方签名头
+    [mod setValue:nil forHTTPHeaderField:@"X-SS-REQ-TICKET"];
+    [mod setValue:nil forHTTPHeaderField:@"X-Khronos"];
+    [mod setValue:nil forHTTPHeaderField:@"X-Gorgon"];
+    [mod setValue:nil forHTTPHeaderField:@"X-Argus"];
+
+    // 随机化 URL 中 device_id / iid / openudid
     NSURLComponents *comps = [NSURLComponents componentsWithURL:mod.URL resolvingAgainstBaseURL:NO];
-    NSMutableArray *queryItems = [comps.queryItems mutableCopy] ?: [NSMutableArray array];
-    for (NSInteger i = queryItems.count - 1; i >= 0; i--) {
-        NSURLQueryItem *item = queryItems[i];
-        if ([item.name containsString:@"device_id"] ||
-            [item.name containsString:@"install_id"] ||
-            [item.name containsString:@"iid"] ||
-            [item.name containsString:@"openudid"] ||
-            [item.name containsString:@"clientudid"]) {
-            [queryItems removeObjectAtIndex:i];
+    if (comps) {
+        NSMutableArray *items = [comps.queryItems mutableCopy] ?: [NSMutableArray array];
+        NSArray *strip = @[@"device_id", @"install_id", @"iid", @"openudid", @"clientudid"];
+        for (NSInteger i = items.count - 1; i >= 0; i--) {
+            if ([strip containsObject:items[i].name]) [items removeObjectAtIndex:i];
         }
+        comps.queryItems = items;
+        mod.URL = comps.URL;
     }
-    comps.queryItems = queryItems;
-    mod.URL = comps.URL;
 
-    // 原始数据转发
-    NSURLSessionTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:mod completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-        [g_interceptedURLs removeObject:self.request.URL.absoluteString];
+    // 用 ephemeral config + 空 protocolClasses，避免被自己拦截
+    NSURLSessionConfiguration *cfg = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+    cfg.protocolClasses = @[];
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:cfg delegate:nil delegateQueue:nil];
 
-        if (error) {
-            [self.client URLProtocol:self didFailWithError:error];
+    NSURLSessionTask *task = [session dataTaskWithRequest:mod completionHandler:^(NSData *data, NSURLResponse *resp, NSError *err) {
+        if (err) {
+            [self.client URLProtocol:self didFailWithError:err];
         } else {
-            // 检查响应中是否包含 verify/risk/captcha 的标记，尝试拦截
-            NSMutableURLResponse *modResp = [response mutableCopy];
-            if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
-                NSHTTPURLResponse *httpResp = (NSHTTPURLResponse *)response;
-                NSMutableDictionary *headers = [httpResp.allHeaderFields mutableCopy];
-                // 去掉服务器下发的安全验证标记
-                [headers removeObjectForKey:@"X-SS-Verify-Required"];
-                [headers removeObjectForKey:@"X-NEED-CAPTCHA"];
-                [headers removeObjectForKey:@"X-Risk-Level"];
-                modResp = [[NSHTTPURLResponse alloc] initWithURL:httpResp.URL statusCode:httpResp.statusCode HTTPVersion:@"HTTP/1.1" headerFields:headers] ?: modResp;
-            }
-
-            [self.client URLProtocol:self didReceiveResponse:modResp cacheStoragePolicy:NSURLCacheStorageNotAllowed];
+            [self.client URLProtocol:self didReceiveResponse:resp cacheStoragePolicy:NSURLCacheStorageNotAllowed];
             if (data) [self.client URLProtocol:self didLoadData:data];
             [self.client URLProtocolDidFinishLoading:self];
         }
@@ -107,38 +87,39 @@ static NSMutableSet *g_interceptedURLs = nil;
     [task resume];
 }
 
-- (void)stopLoading {
-    [g_interceptedURLs removeObject:self.request.URL.absoluteString];
-}
+- (void)stopLoading {}
 
 @end
 
-// ========== 2. 验证弹窗自动拦截 ==========
+// ========== 2. 验证弹窗拦截 ==========
 
 static void hook_presentVC(id self, SEL _cmd, UIViewController *vc, BOOL animated, void (^completion)(void)) {
-    if (g_enabled) {
-        NSString *className = NSStringFromClass([vc class]);
-        NSString *title = vc.title ?: @"";
-        // 检测验证相关弹窗并拦截
-        if ([className containsString:@"Captcha"] ||
-            [className containsString:@"Verify"] ||
-            [className containsString:@"Check"] ||
-            [className containsString:@"Risk"] ||
-            [className containsString:@"Slider"] ||
-            [className containsString:@"HumanVerify"] ||
-            [className containsString:@"SecurityCheck"] ||
-            [title containsString:@"验证"] ||
-            [title containsString:@"滑块"] ||
-            [title containsString:@"校验"] ||
-            [title containsString:@"安全"]) {
-            NSLog(@"[Mogai] Blocked verify VC: %@ (title: %@)", className, title);
-            return;
+    if (g_enabled && vc) {
+        NSString *cn = NSStringFromClass([vc class]);
+        NSString *tt = vc.title ?: @"";
+        // 只拦截抖音自己的验证弹窗，不碰系统弹窗
+        NSBundle *b = [NSBundle bundleForClass:[vc class]];
+        NSString *bid = b.bundleIdentifier ?: @"";
+        BOOL isAppVC = [bid containsString:@"aweme"] || [bid containsString:@"douyin"] ||
+                       [bid containsString:@"snssdk"] || [bid containsString:@"ugc"] ||
+                       [bid containsString:@"bytedance"];
+        if (isAppVC) {
+            NSArray *kw = @[@"Captcha", @"Verify", @"Risk", @"Slider",
+                            @"HumanVerify", @"SecurityCheck",
+                            @"验证", @"滑块", @"校验"];
+            for (NSString *w in kw) {
+                if ([cn containsString:w] || [tt containsString:w]) {
+                    NSLog(@"[Mogai] blocked: %@", cn);
+                    if (completion) completion();
+                    return;
+                }
+            }
         }
     }
     orig_presentVC(self, _cmd, vc, animated, completion);
 }
 
-// ========== 3. sysctl hooks ==========
+// ========== 3. sysctl ==========
 
 static int hook_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen) {
     if (!g_enabled || !oldp || !oldlenp) return orig_sysctl(name, namelen, oldp, oldlenp, newp, newlen);
@@ -164,14 +145,14 @@ static int hook_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void
     return orig_sysctlbyname(name, oldp, oldlenp, newp, newlen);
 }
 
-// ========== 4. UIDevice hooks ==========
+// ========== 4. UIDevice ==========
 
-static NSString *hook_idfv(id self, SEL _cmd)       { return g_enabled ? [DeviceRandomizer sharedInstance].currentIDFV : orig_idfv(self, _cmd); }
-static NSString *hook_name(id self, SEL _cmd)       { return g_enabled ? [DeviceRandomizer sharedInstance].currentDeviceName : orig_name(self, _cmd); }
-static NSString *hook_model(id self, SEL _cmd)      { return g_enabled ? [DeviceRandomizer sharedInstance].currentModel : orig_model(self, _cmd); }
-static NSString *hook_sysVer(id self, SEL _cmd)     { return g_enabled ? [DeviceRandomizer sharedInstance].currentSystemVersion : orig_sysVer(self, _cmd); }
+static NSString *hook_idfv(id self, SEL _cmd)   { return g_enabled ? [DeviceRandomizer sharedInstance].currentIDFV : orig_idfv(self, _cmd); }
+static NSString *hook_name(id self, SEL _cmd)   { return g_enabled ? [DeviceRandomizer sharedInstance].currentDeviceName : orig_name(self, _cmd); }
+static NSString *hook_model(id self, SEL _cmd)  { return g_enabled ? [DeviceRandomizer sharedInstance].currentModel : orig_model(self, _cmd); }
+static NSString *hook_sysVer(id self, SEL _cmd) { return g_enabled ? [DeviceRandomizer sharedInstance].currentSystemVersion : orig_sysVer(self, _cmd); }
 
-// ========== 5. NSProcessInfo hooks ==========
+// ========== 5. NSProcessInfo ==========
 
 static NSString *hook_osVerStr(id self, SEL _cmd) {
     if (!g_enabled) return orig_osVerStr(self, _cmd);
@@ -185,7 +166,7 @@ static NSString *hook_hostName(id self, SEL _cmd) {
 // ========== 6. MobileGestalt ==========
 
 static CFTypeRef hook_MGCopyAnswer(CFStringRef key) {
-    if (!g_enabled || !orig_MGCopyAnswer) return orig_MGCopyAnswer(key);
+    if (!g_enabled || !orig_MGCopyAnswer) return orig_MGCopyAnswer ? orig_MGCopyAnswer(key) : NULL;
     DeviceRandomizer *dr = [DeviceRandomizer sharedInstance];
     NSString *k = (__bridge NSString *)key;
 
@@ -226,10 +207,13 @@ static void SoftClean(void) {
             [home stringByAppendingPathComponent:@"Library/Caches"],
             [home stringByAppendingPathComponent:@"tmp"]
         ]) {
-            for (NSString *item in [fm contentsOfDirectoryAtPath:dir error:nil])
+            NSArray *items = [[fm contentsOfDirectoryAtPath:dir error:nil] copy];
+            for (NSString *item in items)
                 [fm removeItemAtPath:[dir stringByAppendingPathComponent:item] error:nil];
         }
-        for (NSHTTPCookie *c in [NSHTTPCookieStorage sharedHTTPCookieStorage].cookies)
+        // Cookie: copy array first, then delete
+        NSArray *cookies = [[NSHTTPCookieStorage sharedHTTPCookieStorage].cookies copy];
+        for (NSHTTPCookie *c in cookies)
             [[NSHTTPCookieStorage sharedHTTPCookieStorage] deleteCookie:c];
         [[NSURLCache sharedURLCache] removeAllCachedResponses];
     }
@@ -241,8 +225,6 @@ __attribute__((constructor(101)))
 static void MogaiInit(void) {
     @autoreleasepool {
         NSLog(@"[Mogai] injecting into %@", [[NSBundle mainBundle] bundleIdentifier]);
-
-        g_interceptedURLs = [NSMutableSet set];
 
         [[DeviceRandomizer sharedInstance] loadConfig];
         g_enabled = [DeviceRandomizer sharedInstance].enabled;
@@ -277,13 +259,15 @@ static void MogaiInit(void) {
         Swizzle([NSProcessInfo class], @selector(operatingSystemVersionString), (IMP)hook_osVerStr, (IMP *)&orig_osVerStr);
         Swizzle([NSProcessInfo class], @selector(hostName), (IMP)hook_hostName, (IMP *)&orig_hostName);
 
-        // UI 拦截：阻止验证弹窗
+        // UI 拦截
         Swizzle([UIViewController class], @selector(presentViewController:animated:completion:),
                 (IMP)hook_presentVC, (IMP *)&orig_presentVC);
 
-        // NSURLProtocol 注册（网络层拦截）
+        // NSURLProtocol
         [NSURLProtocol registerClass:[MogaiURLProtocol class]];
 
-        NSLog(@"[Mogai] all hooks active");
+        NSLog(@"[Mogai] hooks active — %@ / iOS %@",
+              [DeviceRandomizer sharedInstance].currentModel,
+              [DeviceRandomizer sharedInstance].currentSystemVersion);
     }
 }
