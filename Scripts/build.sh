@@ -60,7 +60,8 @@ for src in \
     "$PROJECT_DIR/MogaiConfig/AppDelegate.m" \
     "$PROJECT_DIR/MogaiConfig/ViewControllers/MainVC.m" \
     "$PROJECT_DIR/MogaiConfig/ViewControllers/LogVC.m" \
-    "$PROJECT_DIR/MogaiConfig/Models/MogaiConfig.m"; do
+    "$PROJECT_DIR/MogaiConfig/Models/MogaiConfig.m" \
+    "$PROJECT_DIR/MogaiConfig/System/SystemModifier.m"; do
 
     if [ ! -f "$src" ]; then
         echo "  [!] Source not found: $src"
@@ -71,6 +72,7 @@ for src in \
         -I"$PROJECT_DIR/MogaiConfig" \
         -I"$PROJECT_DIR/MogaiConfig/ViewControllers" \
         -I"$PROJECT_DIR/MogaiConfig/Models" \
+        -I"$PROJECT_DIR/MogaiConfig/System" \
         -c "$src" \
         -o "$BUILD_DIR/obj/${basename}.o"
     echo "    compiled ${basename}.o"

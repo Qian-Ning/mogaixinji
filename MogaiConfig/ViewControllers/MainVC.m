@@ -1,6 +1,7 @@
 #import "MainVC.h"
 #import "MogaiConfig.h"
 #import "LogVC.h"
+#import "SystemModifier.h"
 
 #define RECT(x,y,w,h) CGRectMake((x),(y),(w),(h))
 
@@ -112,8 +113,14 @@
     [self.scrollView addSubview:self.generateButton];
     y += 60;
 
-    self.cleanButton = [self btn:RECT(pad, y, cw - pad*2, 50) title:@"清理沙盒 + Keychain" color:[UIColor systemOrangeColor] action:@selector(cleanTapped)];
+    // 系统级应用（写入 MobileGestalt 缓存，全设备生效）
+    self.cleanButton = [self btn:RECT(pad, y, cw - pad*2, 50) title:@"系统级改机（全局生效）" color:[UIColor systemPurpleColor] action:@selector(systemApplyTapped)];
     [self.scrollView addSubview:self.cleanButton];
+    y += 60;
+
+    // 沙盒清理
+    UIButton *cleanBtn2 = [self btn:RECT(pad, y, cw - pad*2, 50) title:@"清理缓存 + Cookie" color:[UIColor systemOrangeColor] action:@selector(cleanTapped)];
+    [self.scrollView addSubview:cleanBtn2];
     y += 60;
 
     self.resetButton = [self btn:RECT(pad, y, cw - pad*2, 50) title:@"恢复出厂设置" color:[UIColor systemRedColor] action:@selector(resetTapped)];
@@ -203,6 +210,48 @@
     [self refreshDisplay];
     [LogVC log:@"生成新参数完成"];
     UIAlertController *a = [UIAlertController alertControllerWithTitle:@"已生成" message:@"请关闭抖音后台后重新打开" preferredStyle:UIAlertControllerStyleAlert];
+    [a addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:a animated:YES completion:nil];
+}
+
+- (void)systemApplyTapped {
+    [LogVC log:@"系统级改机启动..."];
+    MogaiConfig *c = [MogaiConfig sharedConfig];
+
+    // 1. 生成新参数
+    if (!c.currentIDFV || c.currentIDFV.length == 0) {
+        [c generateNew];
+    }
+
+    // 2. 写入 MobileGestalt 缓存
+    SystemModifier *sm = [SystemModifier shared];
+    BOOL ok = [sm applyToMGCacheWithModel:c.currentModel
+                               sysVersion:c.currentSystemVersion
+                               deviceName:c.currentDeviceName
+                                  serialN:c.currentSerialNumber
+                              wifiAddress:c.currentWifiMac
+                               btAddress:c.currentBluetoothMac
+                                     udid:c.currentIDFV
+                                   locale:c.currentLocale
+                                 timezone:c.currentTimeZone];
+    // 3. 调用 MGSetAnswer 私有API
+    [sm applyMGSetAnswerWithModel:c.currentModel
+                        sysVersion:c.currentSystemVersion
+                        deviceName:c.currentDeviceName
+                           serialN:c.currentSerialNumber
+                       wifiAddress:c.currentWifiMac
+                        btAddress:c.currentBluetoothMac
+                             udid:c.currentIDFV];
+    // 4. 修改系统偏好
+    [sm applySystemPreferencesWithLocale:c.currentLocale timezone:c.currentTimeZone deviceName:c.currentDeviceName];
+    // 5. 刷新守护进程
+    [sm refreshMobileGestalt];
+
+    NSString *msg = ok ? @"系统级改机成功！\n\n所有APP将看到新设备身份。\n效果持续到下次重启。" : @"缓存文件未找到或写入失败。\n请确认TrollStore已授权。";
+    [LogVC log:ok ? @"系统级改机完成" : @"系统级改机失败"];
+
+    UIAlertController *a = [UIAlertController alertControllerWithTitle:ok ? @"系统级改机成功" : @"失败"
+        message:msg preferredStyle:UIAlertControllerStyleAlert];
     [a addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:a animated:YES completion:nil];
 }

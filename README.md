@@ -1,6 +1,52 @@
-# 魔改新机 v2.0 Pro — TrollStore 注入版
+# 魔改新机 v2.0 Pro — TrollStore 系统级改机
 
-iOS 14.0–16.6 无越狱设备改机工具，通过 TrollStore 注入 dylib 实现设备指纹伪造 + 沙盒清理。
+iOS 14.0–16.6 无越狱设备改机工具，TrollStore 安装。
+
+## 三种模式
+
+| 模式 | 原理 | 效果范围 | 需要 |
+|------|------|---------|------|
+| **系统级改机** | 直接写 MobileGestalt 缓存 + MGSetAnswer | 全设备所有APP | TrollStore + no-container |
+| dylib 注入 | fishhook GOT 劫持 | 单个APP | 重打包IPA |
+| Frida 脚本 | 运行时Hook | 单个APP | frida-server |
+
+**推荐使用系统级改机**——不注入、不闪退、全局生效。
+
+## 系统级改机原理
+
+```
+┌─────────────────────────────────────────┐
+│         MobileGestalt 缓存文件            │
+│  /var/containers/Shared/SystemGroup/      │
+│  systemgroup.com.apple.mobilegestaltcache/ │
+│  Library/Caches/com.apple.MobileGestalt    │
+├─────────────────────────────────────────┤
+│  CacheData:                              │
+│    ProductType = iPhone15,3              │
+│    ProductVersion = 16.6.1              │
+│    SerialNumber = <random>              │
+│    UniqueDeviceID = <random>            │
+│    WifiAddress = <random MAC>          │
+│    BluetoothAddress = <random MAC>     │
+│    UserAssignedDeviceName = <name>     │
+│    ...                                  │
+└─────────────────────────────────────────┘
+         ↑ 写入 ↑                ↓ 读取 ↓
+┌──────────────┐         ┌──────────────┐
+│  MogaiConfig │         │  所有APP     │
+│  (TrollStore)│         │  (抖音/TikTok)│
+│  no-container│         │  读到的都是  │
+│  权限写文件   │         │  伪造的值    │
+└──────────────┘         └──────────────┘
+```
+
+## 使用流程
+
+1. TrollStore 安装 `MogaiConfig.ipa`
+2. 打开配置APP → 启用魔改 → 一键生成新参数
+3. 点「系统级改机（全局生效）」按钮
+4. 等待提示成功
+5. 打开抖音/任何APP → 它们看到的全是伪造设备身份
 
 ## 架构总览
 
